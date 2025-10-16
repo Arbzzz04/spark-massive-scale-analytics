@@ -1,5 +1,11 @@
 # Project diary
 
+## Date: October 16th 2025
+
+Today, I made a small dataset to verify that the PySpark is functioning properly on my local environment. Using the `NameAgeData.csv` file, I implemented a simple Word Count program as an initial test, which I aim to later upscale with a larger dataset. The program successfully read the data, then using the groupBy function I was able to collect the same items in the 'Name' column, and produce the correct output.
+
+Additionally, I researched into potential datasets available online for the Word Count Program. I found sources suggested by my supervisor on Reddit and Wikipedia for data dumps. I decided to work with Wikipedia dumps as they are text heavy and can get quite large in size, suitable for later data processing as well.
+
 ## Date: October 1st 2025
 
 In my first meeting with my supervisor, Dr. O'Keeffe, we discussed the technologies to be used for the project. Hadoop was the initial framework that was decided on in the project description. However, my supervisor advised using Apache Spark, as it's a more modern framework that offers additional capabilities like Spark SQL, MLlib for machine learning and built-in graph processing functionalities.
