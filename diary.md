@@ -1,5 +1,23 @@
 # Project diary
 
+## Date: October 27th 2025
+
+The focus for today is attempting to produce clean data, and pick up where I left of with yesterday's issue of the resulting data remaining seemingly unaffected by the methods of processing I had attempted.
+
+I found that I should probably try and do this word count on a dataset from Kaggle first as this would allow me to practise on a more manageable format instead of XML, I will be able to find a CSV file to perform the word count program on. Looking back at the dataset I chose it seemed quite difficult to perform the operations I desired and I have chosen to take a step back and look for another dataset to allow myself to gain more experience before going onto more complex tasks.
+
+## Date: October 26th 2025
+
+I am going to continue trying to clean the wiki data I have got from the raw XML file. I have looked into regex functions that I can use to potentially clean the data in order to be able to count the words in the file. Although, I am running into a road block as the functions don't seem to be affecting the output in the cleanText column I am generating. I will now look further into the documenation and attempt to find out how I can overcome this dilema.
+
+## Date: October 23nd 2025
+
+I found a file to attempt to process from `https://dumps.wikimedia.org/simplewiki/latest/` in order to find a manageable dataset that I planned to use. The aim with the data I process would be to attempt the word count program in order to continue to scale up with the size of data I am able to process.
+
+Moreover, I have used `https://spark.apache.org/docs/latest/sql-programming-guide.html` in order to understand and learn specific function I feel would allow me to achieve my aim. I have also read parts of chapter 2 from Learning Spark suggested by my supervisor, Dr. O'Keeffe, in order to further my understanding on how DataFrames work.
+
+In terms of getting performance analysis, this will be done once I am successfully able to process this dataset and get a result on my local machine as it is comparatively small. Once I have done this task, I will look to discuss when and how I can gain access to the cluster from the university. At that point, I will look to make more in depth performance analysis based on my findings, as well as report on any problem I run into and how I was able to solve them.
+
 ## Date: October 16th 2025
 
 Today, I made a small dataset to verify that the PySpark is functioning properly on my local environment. Using the `NameAgeData.csv` file, I implemented a simple Word Count program as an initial test, which I aim to later upscale with a larger dataset. The program successfully read the data, then using the groupBy function I was able to collect the same items in the 'Name' column, and produce the correct output.
