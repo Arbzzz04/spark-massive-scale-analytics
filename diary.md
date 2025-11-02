@@ -1,5 +1,21 @@
 # Project diary
 
+## Date: October 29th 2025
+
+I had my second meeting with my supervisor, I was able to sort out a bug in my code that did not allow me to clean the text from the Wikipedia data I was using. Now that the results of the cleaning data worked I have decided to continue with the XML file. This is due to an issue caused by Visual Studio Code, my supervisor helped me to fix this issue during the meeting by performing the 'cleaning' process in one code block.
+
+During the meeting I was told to further research into these concepts:
+
+- Actions - cause something to happen in the cluster
+
+- Transformations - these are lazy and don't affect the cluster
+
+- Lazy Evaluation
+
+I found these terms mentioned in the Learning Spark book and will read more into them. These terms have to do with dataframes and how to process the data. Another factor I had discussed during the meeting was the early deliverables, which were related more towards the project being carried out with Hadoop MapReduce. My supervisor was able to change them for me to suit the project being carried out in Spark instead which set out a clearer frame for me to work with.
+
+I was additionally provided with access to the Cluster via CIM help desk, who sent me an email stating how to access the cluster using an SSH command.
+
 ## Date: October 27th 2025
 
 The focus for today is attempting to produce clean data, and pick up where I left of with yesterday's issue of the resulting data remaining seemingly unaffected by the methods of processing I had attempted.
