@@ -1,5 +1,19 @@
 # Project diary
 
+## Date: November 7th 2025
+
+I was looking into using Google Cloud as a potential way in which to store my data. Since I have access to around 2TB of storage space available, I will need to look further into how I will be able to use that space and use it to for the purpose of testing and processing the dataset I choose.
+
+## Date: November 4th 2025
+
+Today, I focused on understanding transformations, actions and lazy evaluations in Spark.
+
+- Transformations are operations that create a new DataGrame from an existing one. Examples include funtions like map(), filter() and flatMap(). They are lazy, meaning they do not execute immediately but build up a so called logical plan for computation to occur.
+
+- Actions are operations that trigger the actual computation and return a value to the driver or write data to storage, having a real impact that is executed. Examples include count(), collect() and saveAsTextFile(). 
+
+- Lazy Evaluation means Spark delays execution of transformations until an action is called that sets things into motion. This allows Spark to optimize the execution plan through techinques like pipelining and DAG - Directed Acyclic Graph optimisation leading to overall better performance as a result.
+
 ## Date: October 29th 2025
 
 I had my second meeting with my supervisor, I was able to sort out a bug in my code that did not allow me to clean the text from the Wikipedia data I was using. Now that the results of the cleaning data worked I have decided to continue with the XML file. This is due to an issue caused by Visual Studio Code, my supervisor helped me to fix this issue during the meeting by performing the 'cleaning' process in one code block.
