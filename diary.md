@@ -1,5 +1,29 @@
 # Project diary
 
+## Date: November 20th 2025
+
+I had my third meeting with my supervisor, in which I showed my progress on how the program was able to run on the BigData server and that I was able to produce a table to show the word counts. I was able to understand more about the second part of my early deliverables and how to implement a version of it in code. That will be my next goal.
+
+Also sent a ticket to clarify the default modes for the spark-submit command that allows me to run the python script on the BigData server.
+
+## Date: November 19th 2025
+
+I was able to program part of the word count program on the BigData server and implement tests in terms of running my code on a smaller sample dataset, around 1GB, to be able to access that the word count was happening appropriately.
+
+Then I ran the program on the larger set of data, around 100GB. This took a while and I will start using a parameter in my terminal command that will allow me to view the amount of time process the dataset took.
+
+## Date: November 17th 2025
+
+I spend the day learning how to interact with HDFS and how to correctly connect to the rhul BigData cluster. This involved practising commands like listing directories, copying data into HDFS for processing, as well as downloading the Wiki data onto the BigData server via a wget command.
+
+I reviewed how Spark interacts with HDFS internally, which helped me gain an understanding for why storing data in HDFS is necessary for efficient distributed processing.
+
+A key part of the day was understanding how spark-submit works in the cluster's environment. I learned about the different modes (client and cluster), how resources such as executor, cores and memory are allocated and how to incorparate my python script to link to the command. By the end, I had a better idae of how to run my PySpark application on the BigData cluster and how to use the spark-submit command for later performance analysis.
+
+## Date: November 12th 2025
+
+I was not able to use the Google Cloud storage as the one I have access to will not be approriate for the parsing of large datasets and running PySpark. The actual Google Cloud has a free trial and I will look into that for the final deliverables of my project as I need to learn about HDFS as a starter.
+
 ## Date: November 7th 2025
 
 I was looking into using Google Cloud as a potential way in which to store my data. Since I have access to around 2TB of storage space available, I will need to look further into how I will be able to use that space and use it to for the purpose of testing and processing the dataset I choose.
@@ -10,7 +34,7 @@ Today, I focused on understanding transformations, actions and lazy evaluations 
 
 - Transformations are operations that create a new DataGrame from an existing one. Examples include funtions like map(), filter() and flatMap(). They are lazy, meaning they do not execute immediately but build up a so called logical plan for computation to occur.
 
-- Actions are operations that trigger the actual computation and return a value to the driver or write data to storage, having a real impact that is executed. Examples include count(), collect() and saveAsTextFile(). 
+- Actions are operations that trigger the actual computation and return a value to the driver or write data to storage, having a real impact that is executed. Examples include count(), collect() and saveAsTextFile().
 
 - Lazy Evaluation means Spark delays execution of transformations until an action is called that sets things into motion. This allows Spark to optimize the execution plan through techinques like pipelining and DAG - Directed Acyclic Graph optimisation leading to overall better performance as a result.
 
