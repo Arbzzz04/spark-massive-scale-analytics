@@ -1,5 +1,33 @@
 # Project diary
 
+## Date: November 27th 2025
+
+Today I focused on the performance testing stage for the Word Count program as I setup an excel sheet with the list of different configurations I wanted to test out on the 100GB dataset. I had run some tests but ran into a roadblock due to the BigData server repeatedly crashing during a particular configurations execution. Whilst running this configuration the job would run for around 15-20 minutes then proceed to disconnect me from the BigData server. I would then try to restart my connection but the server would be unreachable.
+
+I opened up a ticket in order to understand the issue and was told there was a hardware issue with the server and that the CIM help desk would respond to me once the issue was resolved. My next step will be to continue trying out lower configurations to the one that failed once the server comes back online. I will attempt to incrementally scale and record the execution times for each of the successful experiments and document the ones that failed.
+
+## Date: November 25th 2025
+
+I was to successfully run a full distributed grep job on the 100GB Wikipedia dataset on the BigData cluster. This execution confirmed that the implementation scales correctly over the larger version of the dataset. The job completed without an error message although I did have to use a package to interpret the XML file as a spark dataframe and was able to find the command in the github page: <https://github.com/databricks/spark-xml>.
+
+With the XML reading working, I was able to focus on what my next goal would be which would be to performance test both of my programs with different configurations of executors, cores and memory over the cluster.
+
+## Date: November 23rd 2025
+
+I was able to start progress on my 2nd program, the distributed grep problem, and since I was able to perform the implementation on the same Wikipedia data as both the problems I have been tasked to program are reliant on text-based datasets. During the early stages, I was able to reuse the cleanText I had developed to be used over the word count program in the distributed grep problem to allow for easier access to the words. I was able to again split the words but this time I was matching them to the keyword variable I had defined within the code. I used an sql function, rlike, as the core of my program to find the matching variables with the cleaned text.
+
+I was able to run the code on a 1GB version of the entire Wikipedia dataset to test if the code would run as intended and plan to run the program on the full dataset at a later date when I am sure it is able to find the correct words over the smaller dataset.
+
+## Date: November 21st 2025
+
+I got feedback from the CIM help desk ticket I sent explaining how the spark-submit command works as well as what the theoretical maximum resources I could use on the BigData server. There are 10 executors with 4 cores and 24G of memory each, which are representations of the 10 nodes within the cluster. This being the theoretical max values meant I would not run my program at these values as other users would also need resources for their own programs. I was able to get an insight into the software stack on the cluster through the ticket as well and found that my code had to be compatible with the following versions of each language:
+
+- Python 3.6.9
+
+- Spark 2.3.2
+
+- Hadoop 3.1.1
+
 ## Date: November 20th 2025
 
 I had my third meeting with my supervisor, in which I showed my progress on how the program was able to run on the BigData server and that I was able to produce a table to show the word counts. I was able to understand more about the second part of my early deliverables and how to implement a version of it in code. That will be my next goal.

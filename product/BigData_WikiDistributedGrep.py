@@ -46,10 +46,10 @@ cleanText = (
         .withColumn("cleanText", F.regexp_replace(F.col("cleanText"), r"http\S+", " "))
         # turn anything that isn't a–z or whitespace into space
         .withColumn("cleanText", F.regexp_replace(F.col("cleanText"), r"[^a-z\s]", " "))
-	# remove multiple spaces
+	    # remove multiple spaces
         .withColumn("cleanText", F.regexp_replace(F.col("cleanText"), r"\s+", " "))
-	# remove all single letter's apart from 'a' and 'i'
-	.withColumn("cleanText", F.regexp_replace(F.col("cleanText"), r"\b[b-hj-z]\b", " "))
+	    # remove all single letter's apart from 'a' and 'i'
+	    .withColumn("cleanText", F.regexp_replace(F.col("cleanText"), r"\b[b-hj-z]\b", " "))
         # trim
         .withColumn("cleanText", F.trim(F.col("cleanText")))
         # drop empty rows
