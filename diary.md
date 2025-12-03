@@ -1,5 +1,29 @@
 # Project diary
 
+## Date: December 3rd 2025
+
+I have completed the tests for my Word Count program and will plot them using matplotlib and start testing my Distributed Grep program in the same way that I have been performance testing.
+
+My next step will be to successfully generate plots for each of the tests I have run and make conclusions about each of them.
+
+## Date: December 2nd 2025
+
+I continued implemenations of performance tests on the BigData cluster on my Word Count program. I am running a variety of configurations and using a variety of dataset sizes. My goal will be to performing the same tests on my Distributed Grep program but was delayed due to the hardware issue the server was having.
+
+I have begun the process of creating matplotlib plots and will create a plot for each experiment I ran on the BigData cluster.
+
+## Date: December 1st 2025
+
+I had my fourth meeting with my supervisor, where we discussed a few topics: the expectation for my upcoming presentation, video and reports as well as the continuation of the performance testing stage and the matplotlib plots.
+
+My supervisor told me to structure the performance tests more systematically by beginning with a minimal setup: 1 executor, 1 core, and 4G memory. By doing this I can measure throughput with no parallelism. Once I have this baseline measure, I can examine how scaling with more cores, executors and memory effect the implementation as well as trying it out on different datasizes.
+
+He explained throughput being:
+
+Throughput = Dataset Size (MB)/ Runtime (s)
+
+Finally, I found out about using tmux, which would allow me to run my spark jobs while not being connected to the BigData server, and was advised that if the server goes down for maintenance or crashes, this would 'exit' all the sessions I was runnning and to be wary of that fact.
+
 ## Date: November 27th 2025
 
 Today I focused on the performance testing stage for the Word Count program as I setup an excel sheet with the list of different configurations I wanted to test out on the 100GB dataset. I had run some tests but ran into a roadblock due to the BigData server repeatedly crashing during a particular configurations execution. Whilst running this configuration the job would run for around 15-20 minutes then proceed to disconnect me from the BigData server. I would then try to restart my connection but the server would be unreachable.
