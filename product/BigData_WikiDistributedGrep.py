@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-# using the 1GB sample dataset for testing
+# the HDFS path for the wikipedia dataset
 dataPath = "hdfs:///user/zlac302/datasets/wikipedia/wiki_100gb.xml"
 
 # variable to define regex pattern to perform grep on
@@ -14,13 +14,14 @@ spark = (
 	.getOrCreate()
 )
 
-# read the xml file from the hdfs
+# read wikipedia data dump into DataFrame
 dataFrame = (
     spark.read.format("xml")
 	.option("rowTag", "page")
 	.load(dataPath)
 )
 
+# filter down the dataset using sql to select the title and text columns
 pages = (
     dataFrame
 	.filter(F.col("ns") == 0) # keep only the article content
@@ -32,6 +33,7 @@ pages = (
 	.filter(F.col("text").isNotNull()) # remove any 'text' field with nothing in them
 )
 
+# transform the text column into clean usable data
 cleanText = (
     pages
         # lowercase
@@ -56,6 +58,7 @@ cleanText = (
         .filter(F.length(F.col("cleanText")) > 0)
 )
 
+# showing matches for the word / pattern and the location
 matches = (
     cleanText
         .select(
