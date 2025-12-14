@@ -1,8 +1,10 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
+# the HDFS path for the wikipedia dataset
 dataPath = "hdfs:///user/zlac302/datasets/wikipedia/wiki_100gb.xml"
 
+# creating Spark session with config for xml file parsing
 spark = (
     SparkSession.builder
     .appName("BigDataWikiWordCount")
@@ -10,10 +12,11 @@ spark = (
     .getOrCreate()
 )
 
+# read wikipedia data dump into DataFrame
 df = (
     spark.read.format("xml")
-    .option("rowTag", "page")
-    .option("samplingRatio", 0.1)
+    .option("rowTag", "page") # each <page> element is a record
+    .option("samplingRatio", 0.1) # used for schema interface (not limiting data read)
     .load(dataPath)
 )
 
@@ -56,9 +59,9 @@ cleanText = (
 
 # custom junk words mostly coming from tables / markup
 junkWords = [
-    "infobox", "wikitable", "bgcolor", "style", "align", "center",
-    "rowspan", "colspan", "small", "br", "ref", "name",
-    "url", "website", "archive", "access", "date"
+    "infobox", "wikitable", "bgcolor", "style", "rowspan", 
+    "colspan", "br", "ref", "nbsp", "thumb", "px",
+    "border", "font", "color", "valign", "http", "url"
 ]
 
 # split the pages into seperate words and filter any unnecessary data
@@ -82,14 +85,3 @@ counts = (
 
 # show the table of words and count in terminal
 counts.show(20, truncate=False)
-
-# limit the data saved to the output
-# top20 = counts.limit(20)
-
-# load the results into HDFS
-# outputPath = "hdfs:///user/zlac302/bigdata_wiki_wordcount_output"
-
-# save the wordcount into HDFS
-# top20.write.mode("overwrite").parquet(outputPath)
-
-
