@@ -1,5 +1,21 @@
 # Project diary
 
+## Date: December 13th 2025
+
+Updated some of my graphs for word count and added some of the new graphs for my distributed grep program along with some breakdowns for them to provide some insight into what is being displayed.
+
+## Date: December 10th 2025
+
+I have recommented my code and removed some unnecessary comments/code that was not doing anything. I have left the main code as I used it for my performance testing. I sent a ticket to the CIM help desk as I needed to access the server for some further testing but was delayed by a maintenance update on the hardware meaning the server was down for a couple days.
+
+Next steps are to complete the distributed grep performance graphs using matplotlib and breakdowns using any theoretical findings within my research to explain the results I ended up with.
+
+## Date: December 5th 2025
+
+I have extracted more of the data I gathered from my experimental spark jobs and did some research as to the shape that was forming to provide more insight on why they were occuring in that pattern. I also performed more tests on the Distributed Grep program on the Big Data cluster and recorded the results.
+
+Going forward I want to sort out any commenting and redundant code within my program files.
+
 ## Date: December 3rd 2025
 
 I have completed the tests for my Word Count program and will plot them using matplotlib and start testing my Distributed Grep program in the same way that I have been performance testing.
