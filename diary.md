@@ -1,5 +1,41 @@
 # Project diary
 
+## Date: March 4th 2026
+
+I worked on bringing the functions that I had created together into a main function that reads the real NOAA weather dataset, runs the stat analysis, outputs the results to a Parquet file and generates a graph of the frequency distribution. I did hit a roadblock when running the script locally as I dont have HDFS on my local machine, I would have to wait to save my Parquet file on the BigData cluster. For now, I commented out the section of code that was resulting in the error.
+
+My next step is to look into how to get more data on the university HDFS to perform the analysis on a larger scale of data.
+
+## Date: Febuary 28th 2026
+
+I attempted to tackle the percentile-based buckets and frequency distribution today. Initially, I thought of implementing a for-loop to filter and count the rows for each temperature interval. However, applying what I learnt about Spark execution plans, I understood that this would trigger multiple Spark actions and scan the massive dataset from ground zero each time. To improve this and take a better approach, I implemented PySpark MLlib's Bucketizer. This was a great way to tackle the problem as it allowed me to put the data into fixed percentiles in a single distributed action.
+
+I also added pytest functions to verify the bucket boundaries and total counts using mock data.
+
+## Date: Febuary 22nd 2026
+
+I began writing code for the core stats module. I ran into an interesting issue:
+
+Calculating an exact median in Spark requires a massive shuffle of data across the cluster to sort it, which is not good for performance. After reading through the PySpark documentation, I solved this issue by using F.percentile_approx, which estimates the median much faster without moving all the data around the cluster which would be much more efficient over a large amount of data.
+
+I also successfully set the first mock data test for the function to verify the logic was correct.
+
+## Date: Febuary 18th 2026
+
+I spent time researching TDD and how unit testing works specifically in a distributed PySpark environment. I learnt that using real massive CSV files for testing is not feasible as unit tests are made to be fast and deterministic. Instead, the standard approach is to use a pytest fixture to create a local Spark session, then create small mock DataFrames to test the logic. I also found out about PySpark's assertDataFrameEqual function which allows me to compare distributed dataframes.
+
+## Date: Febuary 12th 2026
+
+Today I looked into potential large numerically heavy datasets to use for the statistical analysis. I looked into NYC taxi data and flight delay datasets, which are quite popular for these type of tasks. In the end, I decided to use weather data from NOAA (National Oceanic and Atmospheric Administration). It has a massive amount of historical temperature recordings in a clean format, which aligns well with my goal to calculate core stats and find a frequency distribution.
+
+## Date: Febuary 2nd 2026
+
+I had a meeting with my supervisor where we discussed the next stage of the project. We spoke about focusing on the statistical analysis problem and selecting a dataset, before choosing an algorithm for the last datamining problem. I will being with core stats then percentile-based buckets as instructed by the project problem.
+
+We looked into the potential use of AWS Academy for accessing cloud resources if needed later in the project. We also discussed automating outputs by saving results as Parquet files and following a structured PySpark unit testing approach.
+
+For the advanced datamining problem later in the project, I may explore Spark MLlib and potentially implement my own variation of an advanced datamining algorithm.
+
 ## Date: December 13th 2025
 
 Updated some of my graphs for word count and added some of the new graphs for my distributed grep program along with some breakdowns for them to provide some insight into what is being displayed.
