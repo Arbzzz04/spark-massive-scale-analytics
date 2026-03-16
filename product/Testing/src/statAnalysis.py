@@ -7,7 +7,7 @@ def get_summary_stats(df, col_name="TEMP"):
         F.count(col_name).alias("count"),
         F.min(col_name).alias("min"),
         F.max(col_name).alias("max"),
-        F.percentile_approx(col_name, 0.5).alias("median")
+        F.expr(f"percentile_approx({col_name},0.5)").alias("median")
     )
     return stats
 
@@ -49,41 +49,74 @@ def visualize_distribution(freq_pdf, splits):
 
 if __name__ == "__main__":
     from pyspark.sql import SparkSession
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+    from pyspark.sql import functions as F
 
+    # start up spark session for cluster execution
     spark = (
         SparkSession.builder
-        .master("local[*]")
-        .appName("WeatherAnalysis")
+        .appName("WeatherAnalysis-2023-Parquet")
         .getOrCreate()
     )
 
+    # variable to define the noaa ghcn daily data schema
+    noaa_schema = StructType([
+        StructField("STATION", StringType(), True),
+        StructField("DATE", StringType(), True),
+        StructField("ELEMENT", StringType(), True),
+        StructField("DATA_VALUE", DoubleType(), True),
+        StructField("M_FLAG", StringType(), True),
+        StructField("Q_FLAG", StringType(), True),
+        StructField("S_FLAG", StringType(), True),
+        StructField("OBS_TIME", StringType(), True)
+    ])
+
+    # read only the 2023 dataset
     df = (
         spark.read.csv(
-            "product/data/01001099999.csv",
-            header=True,
-            inferSchema=True
+            "hdfs:///user/zlac302/datasets/weather/2023.csv",
+            header=False,
+            schema=noaa_schema
         )
     )
 
-    weather_df = df.select("TEMP").na.drop()
+    # filter down the dataset to select only max temperatures and clean garbage data
+    weather_df = (
+        df.filter(F.col("ELEMENT") == "TMAX") 
+        .withColumn("TEMP", F.col("DATA_VALUE") / 10.0) 
+        .select("TEMP")
+        .filter(F.col("TEMP").isNotNull()) 
+        .filter(F.col("TEMP").between(-100.0, 60.0)) 
+    )
 
+    # calculate summary stats and output to terminal
     summary_stats = get_summary_stats(weather_df)
     summary_stats.show()
 
-    freq_df, splits = get_frequency_distribution(weather_df, num_buckets=10)
-    
-    freq_pdf = freq_df.toPandas() 
+    # save summary stats to Parquet on HDFS
+    print("Saving summary stats to Parquet...")
+    summary_path = "hdfs:///user/zlac302/outputs/2023_summary.parquet"
+    summary_stats.coalesce(1).write.parquet(summary_path, mode="overwrite")
 
-    parquet_path = "product/data/temperature_distribution.parquet"
-    
-    # cant run locally as no HDFS present
-    """
-    (
-        freq_df.write
-        .mode("overwrite")
-        .parquet(parquet_path)
-    )
-    """
-    visualize_distribution(freq_pdf, splits)
-    
+    # get frequency distribution with 10 buckets
+    freq_df, splits = get_frequency_distribution(weather_df, num_buckets=10)
+
+    # create human-readable temperature ranges for power bi
+    range_labels = []
+    for i in range(len(splits) - 1):
+        label = f"{round(splits[i], 1)}C to {round(splits[i+1], 1)}C"
+        range_labels.append((float(i), label))
+
+    # join labels to the frequency dataframe
+    labels_df = spark.createDataFrame(range_labels, ["bucket", "temperature_range"])
+    final_export_df = freq_df.join(labels_df, on="bucket", how="inner").orderBy("bucket")
+    final_export_df.show(truncate=False)
+
+    # save frequency distribution to Parquet on HDFS
+    print("Saving distribution data to Parquet...")
+    dist_path = "hdfs:///user/zlac302/outputs/2023_distribution.parquet"
+    final_export_df.coalesce(1).write.parquet(dist_path, mode="overwrite")
+
+    print("All requirements saved to HDFS as Parquet.")
+
     spark.stop()
