@@ -72,5 +72,31 @@ class TestClimateClusterer(unittest.TestCase):
         self.assertEqual(results["STAT1"]["total_prcp"], 10.0)
         
         self.assertEqual(results["STAT2"]["max_temp"], 5.0)
+
+    def test_apply_kmeans(self):
+        # setup: create fake climate profiles
+        schema = StructType([
+            StructField("STATION", StringType(), True),
+            StructField("avg_temp", DoubleType(), True),
+            StructField("max_temp", DoubleType(), True),
+            StructField("min_temp", DoubleType(), True),
+            StructField("total_prcp", DoubleType(), True)
+        ])
+        
+        # stat1 is a hot rainforest, stat2 is a freezing tundra, stat3 is a hot desert
+        mock_features = [
+            ("STAT1", 28.0, 35.0, 22.0, 2500.0),
+            ("STAT2", -5.0, 5.0, -15.0, 150.0),
+            ("STAT3", 30.0, 45.0, 15.0, 20.0)
+        ]
+        feature_df = self.spark.createDataFrame(mock_features, schema)
+
+        # execute: run the clustering algorithm, asking for 2 groups
+        clustered_df = self.clusterer.apply_kmeans(feature_df, k=2)
+
+        # assert: the cluster_id column was created and all 3 stations survived
+        self.assertTrue("cluster_id" in clustered_df.columns)
+        self.assertEqual(clustered_df.count(), 3)
+
 if __name__ == "__main__":
     unittest.main()
