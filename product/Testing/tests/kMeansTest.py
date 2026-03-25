@@ -1,6 +1,5 @@
 import unittest
 from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
 import sys
@@ -24,7 +23,7 @@ class TestClimateClusterer(unittest.TestCase):
         schema = self.clusterer.noaa_schema
         mock_raw_data = [
             ("STAT1", "20230101", "TMAX", 250.0, "", "", "", ""), # valid temp (25.0c)
-            ("STAT1", "20230102", "PRCP", 50.0, "", "", "", ""),  # valid rain (5.0mm)
+            ("STAT1", "20230102", "PRCP", 50.0, "", "", "", ""),  # invalid element (prcp)
             ("STAT1", "20230103", "TMIN", 100.0, "", "", "", ""), # invalid element (tmin)
             ("STAT2", "20230101", "TMAX", None, "", "", "", "")   # invalid (null)
         ]
@@ -35,15 +34,13 @@ class TestClimateClusterer(unittest.TestCase):
         results = clean_df.collect()
 
         # assert: only the first row should survive, and 2500 should become 25.0
-        self.assertEqual(len(results), 2)
+        self.assertEqual(len(results), 1)
         
-        # check the values for TMAX and PRCP
-        temp_row = [r for r in results if r["ELEMENT"] == "TMAX"][0]
-        prcp_row = [r for r in results if r["ELEMENT"] == "PRCP"][0]
+        # check the values for TMAX
+        temp_row = results[0]
         
         # check the cleaned values
         self.assertEqual(temp_row["VALUE"], 25.0)
-        self.assertEqual(prcp_row["VALUE"], 5.0)
 
     def test_extract_features(self):
         # setup: create fake clean data
@@ -54,7 +51,6 @@ class TestClimateClusterer(unittest.TestCase):
         ])
         mock_clean_data = [
             ("STAT1", "TMAX", 10.0), ("STAT1", "TMAX", 30.0), # avg 20, min 10, max 30
-            ("STAT1", "PRCP", 0.0),  ("STAT1", "PRCP", 10.0), # total rain 10
             ("STAT2", "TMAX", -5.0), ("STAT2", "TMAX", 5.0)   # avg 0, min -5, max 5
         ]
         clean_df = self.spark.createDataFrame(mock_clean_data, schema)
@@ -69,9 +65,12 @@ class TestClimateClusterer(unittest.TestCase):
         self.assertEqual(results["STAT1"]["max_temp"], 30.0)
         self.assertEqual(results["STAT1"]["min_temp"], 10.0)
         self.assertEqual(results["STAT1"]["avg_temp"], 20.0)
-        self.assertEqual(results["STAT1"]["total_prcp"], 10.0)
+        self.assertEqual(results["STAT1"]["temp_range"], 20.0)
         
         self.assertEqual(results["STAT2"]["max_temp"], 5.0)
+        self.assertEqual(results["STAT2"]["min_temp"], -5.0)
+        self.assertEqual(results["STAT2"]["avg_temp"], 0.0)
+        self.assertEqual(results["STAT2"]["temp_range"], 10.0)
 
     def test_apply_kmeans(self):
         # setup: create fake climate profiles
@@ -80,14 +79,14 @@ class TestClimateClusterer(unittest.TestCase):
             StructField("avg_temp", DoubleType(), True),
             StructField("max_temp", DoubleType(), True),
             StructField("min_temp", DoubleType(), True),
-            StructField("total_prcp", DoubleType(), True)
+            StructField("temp_range", DoubleType(), True)
         ])
         
-        # stat1 is a hot rainforest, stat2 is a freezing tundra, stat3 is a hot desert
+        # stat1 is hot and stable, stat2 is cold, stat3 is hot and extreme
         mock_features = [
-            ("STAT1", 28.0, 35.0, 22.0, 2500.0),
-            ("STAT2", -5.0, 5.0, -15.0, 150.0),
-            ("STAT3", 30.0, 45.0, 15.0, 20.0)
+            ("STAT1", 28.0, 35.0, 22.0, 13.0),
+            ("STAT2", -5.0, 5.0, -15.0, 20.0),
+            ("STAT3", 30.0, 45.0, 15.0, 30.0)
         ]
         feature_df = self.spark.createDataFrame(mock_features, schema)
 

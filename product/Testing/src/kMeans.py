@@ -24,51 +24,40 @@ class ClimateClusterer:
         ])
 
     def clean_data(self, raw_df):
-        # filter for valid temperatures and precipitation, convert to standard units
+        # filter for valid temperatures, convert to standard units
         return (
-            raw_df.filter(F.col("ELEMENT").isin("TMAX", "PRCP"))
+            raw_df.filter(F.col("ELEMENT") == "TMAX")
             .withColumn("VALUE", F.col("DATA_VALUE") / 10.0)
             .filter(F.col("VALUE").isNotNull())
-            .filter(
-                (F.col("ELEMENT") == "PRCP") | 
-                (F.col("VALUE").between(-100.0, 60.0))
-            )
+            .filter(F.col("VALUE").between(-100.0, 60.0))
             .select("STATION", "ELEMENT", "VALUE")
         )
     
     def extract_features(self, clean_df):
-        # separate temp and rain data
+        # separate temp data
         temp_df = clean_df.filter(F.col("ELEMENT") == "TMAX")
-        prcp_df = clean_df.filter(F.col("ELEMENT") == "PRCP")
 
         # aggregate temperature behavior
         temp_stats = temp_df.groupBy("STATION").agg(
             F.avg("VALUE").alias("avg_temp"),
             F.max("VALUE").alias("max_temp"),
             F.min("VALUE").alias("min_temp")
-        )
-
-        # aggregate total precipitation
-        prcp_stats = prcp_df.groupBy("STATION").agg(
-            F.sum("VALUE").alias("total_prcp")
-        )
+        ).withColumn("temp_range", F.col("max_temp") - F.col("min_temp"))
 
         # join them together and drop stations with missing metrics
-        combined_stats = temp_stats.join(prcp_stats, on="STATION", how="left")
+        combined_stats = temp_stats
 
-        # fill missing precipitation with 0 (no rain) before dropping any rows
-        combined_stats = combined_stats.fillna({"total_prcp": 0.0}) 
         return combined_stats.dropna()
 
     def apply_kmeans(self, feature_df, k=5):
-        # assemble the 4 metrics into a single mathematical vector
+        # assemble the 2 metrics into a single mathematical vector
         assembler = VectorAssembler(
-            inputCols=["avg_temp", "max_temp", "min_temp", "total_prcp"], 
+            inputCols=["avg_temp", "temp_range"], 
             outputCol="raw_features"
         )
         assembled_df = assembler.transform(feature_df)
 
-        # scale the features so precipitation doesn't overpower temperature
+        # scale the features so temperature values are comparable
         scaler = StandardScaler(
             inputCol="raw_features", 
             outputCol="scaled_features", 
@@ -85,7 +74,7 @@ class ClimateClusterer:
         # make predictions and return the final clean dataframe
         predictions = model.transform(scaled_df)
         return predictions.select(
-            "STATION", "avg_temp", "max_temp", "min_temp", "total_prcp", "cluster_id"
+            "STATION", "avg_temp", "max_temp", "min_temp", "temp_range", "cluster_id"
         )
     
     def stop(self):
