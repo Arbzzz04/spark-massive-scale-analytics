@@ -42,7 +42,7 @@ if __name__ == "__main__":
         map_df = pd.merge(plot_df, stations_df, on="STATION", how="inner")
         print(f"Matched {len(map_df)} of {len(plot_df)} stations to coordinates")
         
-        # --- start of temperature scaling logic ---
+        # scale temp zones
         print("calculating temperature scale for legend")
         
         # find the actual average temperature for each random cluster id
@@ -75,8 +75,9 @@ if __name__ == "__main__":
             projection="natural earth"
         )
         
-        out_path = os.path.abspath(os.path.join(current_dir, "..", "data", "climate_map.html"))
-        fig.write_html(out_path)
+        # 
+        outputPath = os.path.abspath(os.path.join(current_dir, "..", "data", "climate_map.html"))
+        fig.write_html(outputPath)
         fig.show()
         
     finally:
