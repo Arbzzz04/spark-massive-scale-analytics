@@ -1,5 +1,71 @@
 # Project diary
 
+## Date: April 4th 2026
+
+Today I completed the executor tests, I moved to partition testing using a fixed executor and core setup so that I can isolate the effects that changing the number of partitions has. I ran the program with a range of partition counts and compared the outcomes to see the outcome.
+
+I also repeated some of the runs to improve confidence in the consistency of the results and extended the partiton tests further by trying larger values. This stage helped me understand the performance tuning in spark is not only about throwing resources at the problem, but also about matching the partitioning strategy to the workload so that the available resources are used more efficiently.
+
+My next step is to review the collected results and compare the best performing configurations.
+
+## Date: April 3rd 2026
+
+I continued the performance testing stage by varying the executors number in the spark-submit command while keeping other factors the same allowing for a controlled experiments. I tested several executor configurations and compared the runtimes to see how well the program would scale as more cluster resources were assigned.
+
+This helped to begin identifying whether adding more executors would improve performance in a meaningful way or whether the gains were starting to level off. I also used this stage to keep a more organised record of outcomes.
+
+My next step was to move on to partition testing so that I could examine how task partitions affect the runtime alongside the executor choices.
+
+## Date: April 1st 2026
+
+I began the performance testing stage for the statistical analysis program. At this stage my focus was to create a more structured and repeatable testing process so that I could compare configurations more reliably.
+
+I used repeated runs for the setup to begin establishing a baseline and recorded information like the runtime and application details from the cluster. This stage allowed me to see how consistent the program was between each of the runs. My next step was to test the programs behaviour under different spark-submit configurations.
+
+## Date: March 30th 2026
+
+I thought about how the clustered output should move between the BigData cluster and my local machine. I realised it would be inefficient to rerun the entire clustering job to adjust the visual output or presentation of the results.
+
+To improve this workflow, I treated the cluster like a place to perform the main workload and use the saved output files for the map and scatter visuals later. The made the project easier to manage and gave me a cleaner seperation between the BigData computation stage and the later visualisation stage of the clustered results.
+
+My next step was to begin the performance testing stage for the statistical analysis program.
+
+## Date: March 27th 2026
+
+After finalising the temperature based K-Means representation I made some more adjustments to the weather dataset used in the main clustering program by adding more data to the total dataset from NOAA. Once the run had completed I worked on handling the output files more carefully. I pulled the results from HDFS onto the cluster machine and moved it into my project data folder so that I could manage them with more ease.
+
+My next step was to make the workflow between the cluster output and the later visulisation stage alot more clear and organised.
+
+## Date: March 26th 2026
+
+After generating the first visualisations of the K-Means results, I reviewed them and made sure they were sensible outcomes. This helped make sure the program ran and also that the climate grouping made sense.
+
+One main issue I spotted was that including precipitation in the main BigData cluster, it resulted in a skewed outcome and producing a less sensible result when viewed on the map as there was no clear pattern or meaningful groups forming. Then I took the precipitation out of the clustering and the representation and proceeded to focus on the temperature features for the final output.
+
+This stage helped to understand the sucess of the K-Means implementation depending not only on the code but also the choice of weather feature representation that made sense when the result was visualised.
+
+## Date: March 19th 2026
+
+Today I started developing the K-Means implementation and spent some time thinking about how the choice of features would affect the clustering results. Therefore my main focus was getting the clustering workflow in place and thinking about which of the statistics in the dataset would provide the most meaningful groups of stations.
+
+I spent time exploring how the clustering output could be interpreted once plotted visually, as I wanted the map and scatter plot outputs after to make sense geographically. This helped to begin connecting the machine learning part of the project with the presentation of the final clustered results.
+
+The next steps would be to generate clustering outputs along with visual representations.
+
+## Date: March 17th 2026
+
+I had a meeting with my supervisor where we discussed a few final project points. We spoke about the Professional Issues report and what would be included in that part of the project. We also discussed the possibility of incorporating AWS Academy in some way, depending if time permitted and it would be realistic for the later stage of the project.
+
+We also went through a few final decisions around the technical direction the project would take. The main outcome was confirming that I would implement the K-Means data mining algorithm, which gave me a good direction to take for the next stage of development.
+
+My next step was to continue with the implementation work for the statistical analysis files while also looking to begin to plan the K-Means program.
+
+## Date: March 10th 2026
+
+Today I bought the statistical analysis functions together and implemented an iteration of the program with the larger set of NOAA weather data. I then implemented a run on the cluster and confirmed a successful run was completed.
+
+My next step was to set a meeting with the supervisor to confirm the algorithm I would be using for the final problem in the project.
+
 ## Date: March 4th 2026
 
 I worked on bringing the functions that I had created together into a main function that reads the real NOAA weather dataset, runs the stat analysis, outputs the results to a Parquet file and generates a graph of the frequency distribution. I did hit a roadblock when running the script locally as I dont have HDFS on my local machine, I would have to wait to save my Parquet file on the BigData cluster. For now, I commented out the section of code that was resulting in the error.
