@@ -1,5 +1,21 @@
 # Project diary
 
+## Date: April 13th 2026
+
+I completed the code and pushed the final version and will focus on rereading my report and looking at my video submittion to see if I can find any flaws. I also need to finalise the README file.
+
+My next step will be to submit the reports and video to the moodle submission.
+
+## Date: April 10th 2026
+
+I created the visual outputs for the performance testing results. For the K-Means and stat analysis program I used matplotlib and pandas as I did for the last performance testing notebooks to show the findings. I also added comments to the production files for BigData Kmeans and stat analysis files to make the code clearer.
+
+## Date: April 7th 2026
+
+I completed the partition testing stage for both the K-Means and statistical analysis programs. With the executor configurations already done from the stage before, I was able to focus on varying the shuffle partition counts to observe how task partitioning affected the runtime alongside the executor choices. I recorded the execution times and app IDs for each run and used the Spark UI to inspect how the resources were being used across each run.
+
+My next step was to take the collected results and show a visual of the performance data.
+
 ## Date: April 4th 2026
 
 Today I completed the executor tests, I moved to partition testing using a fixed executor and core setup so that I can isolate the effects that changing the number of partitions has. I ran the program with a range of partition counts and compared the outcomes to see the outcome.
