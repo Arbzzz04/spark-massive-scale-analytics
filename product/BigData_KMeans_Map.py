@@ -5,19 +5,23 @@ import plotly.express as px
 if __name__ == "__main__":
     print("starting big-data map visualisation")
 
+    # define file paths for input data and output map
     current_dir = os.path.dirname(__file__)
     data_file = os.path.abspath(os.path.join(current_dir, "data", "temperature_zones_1900_2025.csv"))
     stations_file = os.path.abspath(os.path.join(current_dir, "data", "ghcnd-stations.txt"))
     output_file = os.path.abspath(os.path.join(current_dir, "data", "bigdata_temperature_map.html"))
 
+    # load clustered output
     print("loading clustered output")
     plot_df = pd.read_csv(data_file)
 
+    # load station coordinates
     print("loading station coordinates")
     colspecs = [(0, 11), (12, 20), (21, 30)]
     names = ["STATION", "LATITUDE", "LONGITUDE"]
     stations_df = pd.read_fwf(stations_file, colspecs=colspecs, names=names)
 
+    # join clustered data
     print("joining station data")
     map_df = pd.merge(plot_df, stations_df, on="STATION", how="inner")
 
@@ -36,6 +40,7 @@ if __name__ == "__main__":
     # define a clear cold-to-hot color palette
     temp_colors = ["#313695", "#4575b4", "#74add1", "#f46d43", "#a50026"]
 
+    # generate the interactive map with plotly
     print("generating map")
     fig = px.scatter_geo(
         map_df,
@@ -49,6 +54,7 @@ if __name__ == "__main__":
         projection="natural earth"
     )
 
+    # save the map to an HTML file and display it
     fig.write_html(output_file)
     fig.show()
 

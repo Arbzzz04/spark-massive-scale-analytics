@@ -3,6 +3,7 @@ from pyspark.ml.feature import Bucketizer
 import matplotlib.pyplot as plt
 
 def get_summary_stats(df, col_name="TEMP"):
+    # calculate count, min, max and median for the specified column
     stats = df.agg(
         F.count(col_name).alias("count"),
         F.min(col_name).alias("min"),
@@ -12,17 +13,22 @@ def get_summary_stats(df, col_name="TEMP"):
     return stats
 
 def get_frequency_distribution(df, col_name="TEMP", num_buckets=10):
+    # calculate min and max to define bucket splits
     bounds = df.agg(F.min(col_name).alias("min"), F.max(col_name).alias("max")).collect()[0]
     min_val, max_val = bounds["min"], bounds["max"]
     
+    # calculate the step size for the buckets and define the splits
     step = (max_val - min_val) / num_buckets
     
+    # build the list of split points for the bucketizer
     splits = [min_val + i * step for i in range(num_buckets)]
     splits.append(max_val + 0.001)
 
+    # apply bucketizer to assign each temperature to a bucket
     bucketizer = Bucketizer(splits=splits, inputCol=col_name, outputCol="bucket")
     bucketed_df = bucketizer.transform(df)
 
+    # count the number of rows in each bucket to get the frequency distribution
     freq_df = (
         bucketed_df
             .groupBy("bucket") 
@@ -33,12 +39,14 @@ def get_frequency_distribution(df, col_name="TEMP", num_buckets=10):
     return freq_df, splits
 
 def visualize_distribution(freq_pdf, splits):
+    # create readable labels for the buckets using its range
     labels = [f"{round(splits[i], 1)} to {round(splits[i+1], 1)}" for i in range(len(splits)-1)]
     
     plt.figure(figsize=(10, 6))
     
     plt.bar(freq_pdf['bucket'], freq_pdf['count'], tick_label=labels, color='skyblue', edgecolor='black')
     
+    # add labels and title to the plot
     plt.title('Frequency Distribution of Temperatures')
     plt.xlabel('Temperature Ranges')
     plt.ylabel('Frequency (Count)')
@@ -71,7 +79,7 @@ if __name__ == "__main__":
         StructField("OBS_TIME", StringType(), True)
     ])
 
-    # read the entire 70-year weather dataset
+    # read the entire weather dataset
     df = (
         spark.read.csv(
             "hdfs:///user/zlac302/datasets/weather/",
@@ -80,20 +88,20 @@ if __name__ == "__main__":
         )
     )
 
-    # filter dataset to select max temperatures and clean data
+    # filter dataset to select max temperatures and convert to celsius
     weather_df = (
         df.filter(F.col("ELEMENT") == "TMAX") 
         .withColumn("TEMP", F.col("DATA_VALUE") / 10.0) 
         .select("TEMP")
-        .filter(F.col("TEMP").isNotNull()) 
-        .filter(F.col("TEMP").between(-100.0, 60.0)) 
+        .filter(F.col("TEMP").isNotNull()) # filter out nulls
+        .filter(F.col("TEMP").between(-100.0, 60.0)) # filter out unrealistic temperatures
     )
 
     # calculate and output summary stats
     summary_stats = get_summary_stats(weather_df)
     summary_stats.show()
 
-    # export summary stats to csv
+    # export summary stats to csv on HDFS
     print("exporting 100gb summary stats to csv...")
     summary_path_csv = "hdfs:///user/zlac302/outputs/100gb_summary_csv"
     summary_stats.coalesce(1).write.csv(summary_path_csv, header=True, mode="overwrite")

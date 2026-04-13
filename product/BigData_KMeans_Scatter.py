@@ -5,10 +5,12 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     print("starting big-data scatter plot")
 
+    # define file paths for input and output plot
     current_dir = os.path.dirname(__file__)
     input_file = os.path.abspath(os.path.join(current_dir, "data", "temperature_zones_1900_2025.csv"))
     output_file = os.path.abspath(os.path.join(current_dir, "data", "bigdata_temperature_scatter.png"))
 
+    # load clustered output
     print("loading clustered output")
     df = pd.read_csv(input_file)
 
@@ -21,6 +23,7 @@ if __name__ == "__main__":
 
     df["zone_id"] = df["cluster_id"].map(label_map)
 
+    # generate scatter plot of average temp vs temp range
     print("generating scatter plot")
     plt.figure(figsize=(10, 6))
     scatter = plt.scatter(
@@ -36,6 +39,7 @@ if __name__ == "__main__":
     plt.title("k-means temperature zones (1900 to 2025)")
     plt.colorbar(scatter, label="temperature zone")
 
+    # save the plot to a file and display it
     plt.savefig(output_file)
     plt.show()
 
