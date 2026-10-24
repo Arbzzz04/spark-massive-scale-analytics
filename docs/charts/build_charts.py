@@ -103,6 +103,43 @@ for mode, t in THEMES.items():
     legend(b, t)
     save(fig, "executors", mode)
 
+    # 1b - the absolute runtimes behind those speed-ups
+    fig, (a, b) = figure(t)
+    for df, key, name in [(wc_exec, "wc", "Word Count"), (grep_exec, "grep", "Distributed Grep")]:
+        line(a, t, df["num_executors"], df["runtime_seconds"], t[key], name)
+        first, last = df["runtime_seconds"].iloc[0], df["runtime_seconds"].iloc[-1]
+        end_label(a, t, 1, first, f"{first / 60:.0f} min", dx=-10, ha="right")
+        end_label(a, t, 10, last, f"{last / 60:.0f} min", dy=10 if key == "wc" else -10)
+    style(a, t, "Text workloads · runtime, 100 GB (1 core per executor)", "executors", "runtime (minutes)")
+    a.yaxis.set_major_formatter(minutes); a.set_yticks(range(0, 30001, 6000)); a.set_ylim(0, 32000)
+    a.set_xticks(range(1, 11)); a.set_xlim(-0.6, 11.4)
+    legend(a, t, loc="upper right")
+
+    for df, key, name in [(stat_exec, "stat", "Statistical Analysis"), (km_exec, "km", "K-Means")]:
+        line(b, t, df["num_executors"], df["runtime_seconds"], t[key], name)
+        first, last = df["runtime_seconds"].iloc[0], df["runtime_seconds"].iloc[-1]
+        end_label(b, t, 2, first, f"{first:,.0f} s", dx=10)
+        end_label(b, t, 10, last, f"{last:,.0f} s", dy=10 if key == "stat" else -10)
+    style(b, t, "Numerical workloads · runtime, ~100 GB (4 cores per executor)", "executors", "runtime (seconds)")
+    b.set_xticks(range(2, 11, 2)); b.set_xlim(1.6, 11.4); b.set_ylim(0, 1400)
+    legend(b, t, loc="upper right")
+    save(fig, "runtime", mode)
+
+    # 1c - throughput, as plotted in the stat analysis and K-Means notebooks
+    fig, ax = plt.subplots(figsize=(8, 4.4), dpi=160)
+    fig.patch.set_facecolor(t["surface"])
+    for df, key, name in [(stat_exec, "stat", "Statistical Analysis"), (km_exec, "km", "K-Means")]:
+        line(ax, t, df["num_executors"], df["throughput_mbps"], t[key], name)
+        first, last = df["throughput_mbps"].iloc[0], df["throughput_mbps"].iloc[-1]
+        end_label(ax, t, 2, first, f"{first:.0f} MB/s", dx=10, dy=-8 if key == "stat" else 8)
+        end_label(ax, t, 10, last, f"{last:.0f} MB/s")
+    style(ax, t, "Throughput vs executors · NOAA ~100 GB", "executors (4 cores each)", "throughput (MB/s)")
+    ax.set_xticks(range(2, 11, 2)); ax.set_xlim(1.6, 11.8); ax.set_ylim(0, 470)
+    legend(ax, t, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, f"perf_throughput_{mode}.png"), facecolor=fig.get_facecolor())
+    plt.close(fig)
+
     # 2 - data scaling
     fig, (a, b) = figure(t)
     for n, color in zip([2, 6, 10], t["ramp"]):
@@ -126,11 +163,22 @@ for mode, t in THEMES.items():
     # 3 - cores and memory
     fig, (a, b) = figure(t)
     line(a, t, wc_cores["total_cores"], wc_cores["runtime_seconds"], t["wc"], "Word Count · 100 GB")
-    end_label(a, t, 4, 9136, "152 min", dy=-2)
-    end_label(a, t, 36, 1276, "21 min", dy=14, ha="center", dx=0)
-    style(a, t, "More cores · Word Count on 100 GB", "total cores (executors × cores)", "runtime (minutes)")
+    # label every point with its configuration, as the original notebook chart did
+    # the curve falls to the right, so up-and-right of each point is always clear
+    for _, r in wc_cores.iterrows():
+        cfg = f"{r.num_executors}×{r.executor_cores}"
+        if r.total_cores == 4:
+            cfg += " · 152 min"
+        if r.total_cores == 36:
+            a.annotate(f"{cfg} · 21 min", (r.total_cores, r.runtime_seconds), xytext=(0, -12),
+                       textcoords="offset points", ha="center", va="top", color=t["ink2"], fontsize=9)
+            continue
+        a.annotate(cfg, (r.total_cores, r.runtime_seconds), xytext=(7, 7), textcoords="offset points",
+                   ha="left", va="bottom", color=t["ink2"], fontsize=9)
+    style(a, t, "More cores · Word Count on 100 GB", "total cores · labels show executors × cores per executor",
+          "runtime (minutes)")
     a.yaxis.set_major_formatter(minutes); a.set_yticks(range(0, 9001, 1800)); a.set_ylim(0, 10200)
-    a.set_xticks(range(4, 37, 4))
+    a.set_xticks(range(4, 37, 4)); a.set_xlim(1, 39)
     legend(a, t, loc="upper right")
 
     mem_gb = wc_mem["executor_memory"].str.rstrip("G").astype(int)
@@ -138,8 +186,10 @@ for mode, t in THEMES.items():
     line(b, t, mem_gb, grep_mem["runtime_seconds"], t["grep"], "Distributed Grep")
     end_label(b, t, 4, 1396, "fastest at 4 GB", dy=16, ha="center", dx=0)
     end_label(b, t, 4, 656, "fastest at 4 GB", dy=-16, ha="center", dx=0)
-    style(b, t, "More memory · 6 executors × 4 cores, 100 GB", "memory per executor (GB)", "runtime (seconds)")
+    style(b, t, "More memory · 6 executors × 4 cores, 100 GB", "memory per executor  [total across 6 executors]",
+          "runtime (seconds)")
     b.set_xticks(mem_gb); b.set_ylim(0, 2000)
+    b.set_xticklabels([f"{m} GB\n[{m * 6} GB]" for m in mem_gb])
     legend(b, t, loc="upper right")
     save(fig, "resources", mode)
 

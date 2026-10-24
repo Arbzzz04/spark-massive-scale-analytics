@@ -15,20 +15,19 @@ dataset size) affects runtime and throughput.
 | 3 | **Statistical Analysis** | NOAA GHCN-Daily weather, 1900–2025 (~100 GB) | Explicit schema, `percentile_approx`, MLlib `Bucketizer` frequency distribution |
 | 4 | **K-Means Clustering** | NOAA GHCN-Daily weather (~100 GB) | MLlib `VectorAssembler`, `StandardScaler`, `KMeans` to group weather stations into temperature zones |
 
-🎥 **Demo video:** <https://www.youtube.com/watch?v=Q9mJMntAv3c>
 📄 **Full report:** [`documents/ArbaazJaffer.final.pdf`](documents/ArbaazJaffer.final.pdf)
 
 ### 🌍 Final result: global temperature zones from 100 GB of weather data
 
-<a href="https://arbzzz04.github.io/spark-massive-scale-analytics/map/">
-  <img src="docs/images/kmeans_world_map.png" alt="World map of 40,179 NOAA weather stations coloured by K-Means temperature zone">
-</a>
+<img src="docs/images/kmeans_world_map.png" alt="World map of 40,179 NOAA weather stations coloured by K-Means temperature zone">
 
 Spark MLlib K-Means (k = 5) clustered **40,179 weather stations** using 125 years of daily maximum temperatures.
 No location data went into the model, yet the zones it found match real climate bands: Canada, Scandinavia and
 Russia in the coldest zones, and Mexico, Africa, India, South-East Asia and Australia in the hottest.
-**[▶ Open the interactive map](https://arbzzz04.github.io/spark-massive-scale-analytics/map/)** to zoom in and hover
-over any station. You can also download [`docs/map/index.html`](docs/map/index.html) and open it in a browser.
+
+> **🗺️ Interactive version:** zoom, pan and hover over any station to see its name and temperatures. Open
+> [`docs/map/index.html`](docs/map/index.html), click **Download raw file** (⬇) at the top right of the file view,
+> and open the downloaded file in any browser.
 
 ---
 
@@ -291,6 +290,28 @@ executors halves the runtime.
 - **All 10 executors share one physical server.** CPU, memory bandwidth, disk and network are shared, so no workload
   could scale indefinitely here.
 
+**The runtimes behind those speed-ups:**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_runtime_dark.png">
+  <img src="docs/images/perf_runtime_light.png" alt="Runtime against number of executors for Word Count and Grep in minutes, and for Statistical Analysis and K-Means in seconds">
+</picture>
+
+Word Count on one single-core executor took **8 h 12 min**, and ten executors brought it down to **53 min**. Grep went
+from **4 h 50 min to 27 min**. On the 4-core executors, Statistical Analysis dropped from 1,207 s to 357 s and K-Means
+from 759 s to 256 s. The biggest single drop for both came between 4 and 6 executors, where runtime nearly halved.
+
+**Throughput as executors are added (numerical workloads):**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_throughput_dark.png">
+  <img src="docs/images/perf_throughput_light.png" width="70%" alt="Throughput in MB/s against number of executors for Statistical Analysis and K-Means">
+</picture>
+
+Throughput rose from 87 to 293 MB/s for Statistical Analysis and from 138 to 409 MB/s for K-Means. The biggest jump
+for both was from 4 to 6 executors. After that, Statistical Analysis levels off between 8 and 10 executors (the
+shared server's bandwidth limit), while K-Means slows between 6 and 8 and then climbs again.
+
 ---
 
 ### ② Scaling the data: 10 GB → 100 GB
@@ -307,6 +328,25 @@ executors halves the runtime.
   growth only takes it from 3 to 16 minutes: the extra parallelism absorbs the extra data (Gustafson's law).
 - **Grep is near-linear:** 10× the data costs 7.3× the time (95 s → 696 s). Throughput actually *rises* from
   ~108 MB/s to ~147 MB/s, because fixed start-up costs are spread over more data.
+
+**Full Word Count sweep** (every run from the tracker; the fastest per dataset size is in bold). The chart above
+plots the 2-, 6- and 10-executor columns:
+
+| Dataset | 2 executors | 4 executors | 6 executors | 8 executors | 10 executors |
+|---|---:|---:|---:|---:|---:|
+| **10 GB** | 584 s | 396 s | 206 s | 201 s | **158 s** |
+| **20 GB** | 988 s | 608 s | 344 s | **271 s** | 274 s |
+| **30 GB** | 1,360 s | 906 s | 536 s | 439 s | **293 s** |
+| **40 GB** | 1,555 s | 1,019 s | 648 s | 492 s | **402 s** |
+| **50 GB** | 2,629 s | 1,108 s | 782 s | 638 s | **445 s** |
+| **60 GB** | 3,433 s | 1,307 s | 933 s | 651 s | **618 s** |
+| **70 GB** | 3,530 s | 1,678 s | 1,021 s | 942 s | **682 s** |
+| **80 GB** | 4,426 s | 1,845 s | 1,228 s | 1,059 s | **869 s** |
+| **90 GB** | 4,976 s | 2,136 s | 1,302 s | 962 s | **802 s** |
+| **100 GB** | 5,533 s | 2,109 s | 1,396 s | 1,112 s | **957 s** |
+
+From 20 GB upwards, going from 2 to 4 executors gives the biggest cut, and the gains flatten out by 8–10 executors.
+The one case where 8 executors beat 10 (20 GB: 271 s vs 274 s) is within run-to-run noise on the shared cluster.
 
 ---
 
