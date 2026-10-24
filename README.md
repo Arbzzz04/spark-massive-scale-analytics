@@ -248,50 +248,121 @@ be rebuilt without Spark using [`docs/map/build_map.py`](docs/map/build_map.py).
 
 ## Results & performance analysis
 
-Every job was timed with `time spark-submit …` on the cluster. The numbers below come from the notebooks in
-[`product/Performance_testing/`](product/Performance_testing), which are saved with their outputs, so you can
-read them on GitHub without running anything.
+Every job was timed with `time spark-submit …` on the cluster, and its application ID, shuffle size and notes were
+logged in the benchmark trackers
+([`FYP_performance_testing.xlsx`](product/Performance_testing/FYP_performance_testing.xlsx) and
+[`FYP_final_performance_tracker.xlsx`](product/Performance_testing/FYP_final_performance_tracker.xlsx)). The charts
+below are built from those spreadsheets by [`docs/charts/build_charts.py`](docs/charts/build_charts.py). The original
+analysis notebooks are in [`product/Performance_testing/`](product/Performance_testing).
 
-### Headline numbers
+### At a glance
 
-| Program | Experiment | Slowest → fastest | Speed-up |
-|---|---|---|---|
-| Word Count (100 GB) | 1 → 10 executors (1 core each) | 29,515 s → 3,158 s | **9.3×** |
-| Word Count (100 GB) | 4 → 36 total cores | 9,136 s → 1,276 s | **7.2×** |
-| Distributed Grep (100 GB) | 1 → 10 executors (1 core each) | 17,384 s → 1,646 s | **10.6×** |
-| Statistical Analysis (100 GB) | 2 → 10 executors (4 cores each) | 1,207 s → 357 s | **3.4×** (87 → 293 MB/s) |
-| K-Means (100 GB) | 2 → 10 executors (4 cores each) | 759 s → 256 s | **3.0×** (138 → 409 MB/s) |
+| | Word Count | Distributed Grep | Statistical Analysis | K-Means |
+|---|:---:|:---:|:---:|:---:|
+| **Dataset** | Wikipedia · 100 GB | Wikipedia · 100 GB | NOAA · ~100 GB | NOAA · ~100 GB |
+| **Slowest → fastest 100 GB run** | 8 h 12 m → 16 m | 4 h 50 m → 11 m | 20 m → 6 m | 15 m → 4 m |
+| **Speed-up from scaling out** | **9.3×** | **10.6×** | **3.4×** | **3.0×** |
+| **Shuffle per run** | large | none | ~67 MB | 1.0–1.8 GB |
+| **Peak throughput** | ~107 MB/s | ~156 MB/s | 293 MB/s | 409 MB/s |
+| **Best `shuffle.partitions`** | n/a | n/a | 128 | 800 |
 
-### Word Count: runtime vs executors, and vs dataset size (10–100 GB)
-<p>
-  <img src="docs/images/wordcount_2.png" width="49%" alt="Word count runtime vs executors">
-  <img src="docs/images/wordcount_3.png" width="49%" alt="Word count runtime by dataset size">
-</p>
+---
 
-### Distributed Grep: runtime vs executors, and vs dataset size
-<p>
-  <img src="docs/images/distributedgrep_1.png" width="49%" alt="Grep runtime vs executors">
-  <img src="docs/images/distributedgrep_2.png" width="49%" alt="Grep runtime vs dataset size">
-</p>
+### ① Scaling out: what adding executors buys you
 
-### Statistical Analysis & K-Means: speed-up compared with ideal linear scaling
-<p>
-  <img src="docs/images/statanalysis_2.png" width="49%" alt="Stat analysis speedup">
-  <img src="docs/images/kmeans_2.png" width="49%" alt="K-Means speedup">
-</p>
+> **Takeaway:** the text jobs scale almost perfectly, while the numerical jobs top out at about 3×. The difference is
+> how much each one has to shuffle.
 
-### K-Means: runtime and shuffle volume vs shuffle partitions
-<p>
-  <img src="docs/images/kmeans_3.png" width="49%" alt="K-Means runtime vs partitions">
-  <img src="docs/images/kmeans_4.png" width="49%" alt="K-Means shuffle volume vs partitions">
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_executors_dark.png">
+  <img src="docs/images/perf_executors_light.png" alt="Speed-up against number of executors for all four programs, compared with ideal linear scaling">
+</picture>
 
-### What the experiments showed
-- **The text workloads parallelise very well.** Word Count and Grep get close to a 10× speed-up from 10 executors, because tokenising and filtering are almost entirely independent per partition.
-- **Gains shrink after about 6–8 executors** (Amdahl's law). All 10 "nodes" are VMs on **one physical server**, so they share CPU, memory bandwidth, disk and network.
-- **Runtime grows roughly linearly with data size** (Grep, 10 → 100 GB), so throughput stays steady as the input grows.
-- **Iterative ML scales worse than a single-pass aggregation.** Each K-Means iteration triggers a shuffle to reassign points to centroids, which keeps its speed-up further below the ideal line than Statistical Analysis.
-- **Shuffle partitions matter more for K-Means.** Shuffle volume grows with the partition count (1.0 → 1.8 GB), while Statistical Analysis stays at about 67 MB. The fastest K-Means run used 800 partitions (421 s), and the fastest Statistical Analysis run used 128 (884 s). These are the values used in the recommended commands below.
+Each line shows speed-up relative to the smallest configuration, against the dashed *ideal* line where doubling the
+executors halves the runtime.
+
+- **Word Count and Grep track the ideal line.** Each partition is tokenised and filtered on its own, so the work
+  splits cleanly. Grep even finishes slightly *above* the line (10.6× from 10 executors); a likely cause is that a
+  single 4 GB executor was memory-constrained.
+- **Statistical Analysis and K-Means peel away after 6 executors.** Their fixed costs (shuffle, the final single-task
+  stage, and for K-Means a shuffle on every iteration) don't shrink as executors are added. This is Amdahl's law in
+  practice. K-Means still reaches the higher throughput (409 vs 293 MB/s), because feature extraction shrinks
+  hundreds of millions of records down to one row per station before the iterative stage starts.
+- **All 10 executors share one physical server.** CPU, memory bandwidth, disk and network are shared, so no workload
+  could scale indefinitely here.
+
+---
+
+### ② Scaling the data: 10 GB → 100 GB
+
+> **Takeaway:** Grep's runtime grows in step with the data. Word Count needs enough executors, or its runtime grows
+> faster than the data does.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_datasize_dark.png">
+  <img src="docs/images/perf_datasize_light.png" alt="Runtime against Wikipedia subset size for Word Count at 2, 6 and 10 executors, and for Distributed Grep">
+</picture>
+
+- **Word Count with 2 executors** goes from 10 to 92 minutes as the data grows 10×. With **10 executors** the same
+  growth only takes it from 3 to 16 minutes: the extra parallelism absorbs the extra data (Gustafson's law).
+- **Grep is near-linear:** 10× the data costs 7.3× the time (95 s → 696 s). Throughput actually *rises* from
+  ~108 MB/s to ~147 MB/s, because fixed start-up costs are spread over more data.
+
+---
+
+### ③ Tuning resources: cores vs memory
+
+> **Takeaway:** cores are what speeds Spark up. Past 4 GB per executor, extra memory bought nothing.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_resources_dark.png">
+  <img src="docs/images/perf_resources_light.png" alt="Word Count runtime against total cores, and Word Count and Grep runtime against memory per executor">
+</picture>
+
+- **Cores:** going from 4 to 36 total cores cut Word Count on 100 GB from **152 to 21 minutes (7.2×)**. Most of the
+  gain came early, between 4 and 12 cores.
+- **Memory:** with 6 executors × 4 cores, both jobs were fastest at **4 GB per executor**. 1 GB was too tight, and
+  6–10 GB gave no further improvement. Word Count was even slower at 8 GB, which the report puts down to longer
+  garbage-collection pauses on bigger heaps. Once each partition fits in memory, the job is bound by CPU and I/O,
+  not RAM.
+
+---
+
+### ④ Shuffle partitions: the setting that matters for K-Means
+
+> **Takeaway:** `spark.sql.shuffle.partitions` barely affects a single aggregation, but it is a real tuning knob for
+> iterative ML.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/perf_partitions_dark.png">
+  <img src="docs/images/perf_partitions_light.png" alt="Runtime and shuffle volume against shuffle partitions for Statistical Analysis and K-Means">
+</picture>
+
+All runs used 4 executors × 4 cores, varying only the shuffle partition count.
+
+- **Statistical Analysis** shuffles only ~67 MB at every setting, so the partition count makes little difference.
+  Most settings land between 880 and 1,000 s, and the best was **128 partitions (884 s)**. One run at 400
+  partitions finished in 627 s, but two repeats took about 1,120 s (the faint dots). It was an anomaly, and a reminder
+  of how much noise a shared cluster adds; the line plots the mean.
+- **K-Means** shuffles more as partitions increase (1.0 → 1.8 GB), yet the extra parallelism still won up to
+  **800 partitions (421 s, 1.5× faster than 16)**. At 1,200 partitions, task-scheduling overhead took over and the
+  runtime jumped back to 678 s.
+
+---
+
+### Recommended configuration
+
+For workloads of this size on this cluster (report §5.6):
+
+| Setting | Recommendation | Why |
+|---|---|---|
+| Executors × cores | **6–8 × 4** | The biggest gains came from 2 → 6 executors; beyond 8 the returns diminish on the shared server |
+| Memory per executor | **4 GB** | No improvement beyond 4–6 GB, and requesting less leaves room for other users' jobs |
+| `shuffle.partitions` for aggregation | **128–200** | The shuffle volume is fixed (~67 MB), so the default or a moderate value is enough |
+| `shuffle.partitions` for iterative ML | **400–800** | Balances parallelism against the growing shuffle volume |
+
+The [`spark-submit` commands](#3-submit-the-jobs) below use 6 × 4 executors, with 128 partitions for Statistical
+Analysis and 800 for K-Means.
 
 ---
 
@@ -306,7 +377,7 @@ read them on GitHub without running anything.
 │   ├── BigData_KMeans.py                # (4) cluster job, 100 GB NOAA
 │   ├── BigData_KMeans_Map.py            # local: interactive plotly world map of clusters
 │   ├── BigData_KMeans_Scatter.py        # local: matplotlib scatter of clusters
-│   ├── Performance_testing/             # pre-rendered Jupyter notebooks with results + charts
+│   ├── Performance_testing/             # benchmark trackers (.xlsx) + analysis notebooks
 │   └── Testing/
 │       ├── src/kMeans.py                # ClimateClusterer class (shared with cluster job)
 │       ├── src/statAnalysis.py          # stats functions (2023 subset version)
@@ -315,7 +386,8 @@ read them on GitHub without running anything.
 │       └── wikiWordCount.ipynb, wordcount.ipynb, wikiDistributedGrep.py  # early prototypes
 ├── documents/                           # final report, interim report, professional issues, retrospective
 ├── docs/
-│   ├── images/                          # charts from the notebooks + world map and scatter
+│   ├── images/                          # performance charts (light + dark), world map, scatter
+│   ├── charts/                          # build_charts.py: rebuilds the charts from the trackers
 │   ├── map/                             # interactive Plotly map (index.html) + build_map.py
 │   ├── data/                            # clustered K-Means output from the cluster run (CSV)
 │   ├── diary.md                         # development diary (Oct 2025 – Apr 2026)
