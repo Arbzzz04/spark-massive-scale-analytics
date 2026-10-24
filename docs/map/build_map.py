@@ -58,9 +58,15 @@ def make_fig(width=None, height=None, marker=3):
 
 
 # interactive page: plotly.js from CDN keeps the file small
-make_fig(marker=4).write_html(os.path.join(out_dir, "index.html"), include_plotlyjs="cdn", full_html=True,
+page = os.path.join(out_dir, "index.html")
+make_fig(marker=4).write_html(page, include_plotlyjs="cdn", full_html=True,
                               config={"displaylogo": False, "responsive": True},
                               default_width="100%", default_height="95vh")
+with open(page, encoding="utf-8") as f:
+    html = f.read()
+html = html.replace("<head>", "<head><title>K-Means Temperature Zones · Spark FYP</title>", 1)
+with open(page, "w", encoding="utf-8") as f:
+    f.write(html)
 
 # fixed-size page used only to screenshot the static PNG
 make_fig(width=1800, height=960, marker=3.2).write_html(
