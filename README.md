@@ -18,6 +18,18 @@ dataset size) affects runtime and throughput.
 🎥 **Demo video:** <https://www.youtube.com/watch?v=Q9mJMntAv3c>
 📄 **Full report:** [`documents/ArbaazJaffer.final.pdf`](documents/ArbaazJaffer.final.pdf)
 
+### 🌍 Final result: global temperature zones from 100 GB of weather data
+
+<a href="https://arbzzz04.github.io/spark-massive-scale-analytics/map/">
+  <img src="docs/images/kmeans_world_map.png" alt="World map of 40,179 NOAA weather stations coloured by K-Means temperature zone">
+</a>
+
+Spark MLlib K-Means (k = 5) clustered **40,179 weather stations** using 125 years of daily maximum temperatures.
+No location data went into the model, yet the zones it found match real climate bands: Canada, Scandinavia and
+Russia in the coldest zones, and Mexico, Africa, India, South-East Asia and Australia in the hottest.
+**[▶ Open the interactive map](https://arbzzz04.github.io/spark-massive-scale-analytics/map/)** to zoom in and hover
+over any station. You can also download [`docs/map/index.html`](docs/map/index.html) and open it in a browser.
+
 ---
 
 ## Contents
@@ -217,6 +229,16 @@ flowchart TB
 - **`apply_kmeans`** runs `VectorAssembler(avg_temp, temp_range)` → `StandardScaler` → `KMeans(k=5, seed=42)`, and writes the clustered stations to HDFS.
 - **Locally:** [`BigData_KMeans_Map.py`](product/BigData_KMeans_Map.py) joins the clusters with NOAA station coordinates, ranks the zones from coldest to hottest and draws an interactive Plotly world map. [`BigData_KMeans_Scatter.py`](product/BigData_KMeans_Scatter.py) draws the average temperature against the temperature range.
 
+The map is at the [top of this README](#-final-result-global-temperature-zones-from-100-gb-of-weather-data). The
+scatter below shows the same five zones in feature space. The model separates stations by **both** features:
+Zone 3, for example, is warm on average but has an extreme range, which is typical of continental interiors.
+
+<img src="docs/images/kmeans_scatter.png" alt="Scatter plot of mean daily max temperature against temperature range, coloured by zone">
+
+The clustered output from the cluster run is included at
+[`docs/data/temperature_zones_1900_2025.csv`](docs/data/temperature_zones_1900_2025.csv), so the visualisations can
+be rebuilt without Spark using [`docs/map/build_map.py`](docs/map/build_map.py).
+
 > **Design decision:** the first version also clustered on precipitation. That produced clusters with no
 > geographic pattern, so precipitation was dropped. Clustering on temperature alone gives zones that line up
 > with real climate bands: Scandinavia, Canada and Russia in the coldest zones, and Central Africa, South-East Asia
@@ -293,7 +315,9 @@ read them on GitHub without running anything.
 │       └── wikiWordCount.ipynb, wordcount.ipynb, wikiDistributedGrep.py  # early prototypes
 ├── documents/                           # final report, interim report, professional issues, retrospective
 ├── docs/
-│   ├── images/                          # charts exported from the notebooks
+│   ├── images/                          # charts from the notebooks + world map and scatter
+│   ├── map/                             # interactive Plotly map (index.html) + build_map.py
+│   ├── data/                            # clustered K-Means output from the cluster run (CSV)
 │   ├── diary.md                         # development diary (Oct 2025 – Apr 2026)
 │   └── original_submission_README.md    # README as submitted
 ├── requirements.txt
