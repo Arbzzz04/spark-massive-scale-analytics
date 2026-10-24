@@ -19,15 +19,16 @@ dataset size) affects runtime and throughput.
 
 ### 🌍 Final result: global temperature zones from 100 GB of weather data
 
-<img src="docs/images/kmeans_world_map.png" alt="World map of 40,179 NOAA weather stations coloured by K-Means temperature zone">
+<a href="https://arbzzz04.github.io/spark-massive-scale-analytics/map/">
+  <img src="docs/images/kmeans_world_map.png" alt="World map of 40,179 NOAA weather stations coloured by K-Means temperature zone">
+</a>
 
 Spark MLlib K-Means (k = 5) clustered **40,179 weather stations** using 125 years of daily maximum temperatures.
 No location data went into the model, yet the zones it found match real climate bands: Canada, Scandinavia and
 Russia in the coldest zones, and Mexico, Africa, India, South-East Asia and Australia in the hottest.
 
-> **🗺️ Interactive version:** zoom, pan and hover over any station to see its name and temperatures. Open
-> [`docs/map/index.html`](docs/map/index.html), click **Download raw file** (⬇) at the top right of the file view,
-> and open the downloaded file in any browser.
+> **🗺️ [Open the interactive map](https://arbzzz04.github.io/spark-massive-scale-analytics/map/)**: zoom, pan and
+> hover over any station to see its name and temperatures.
 
 ---
 
