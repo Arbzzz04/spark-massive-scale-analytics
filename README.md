@@ -34,129 +34,112 @@ dataset size) affects runtime and throughput.
 
 ## Architecture
 
-The project ran on the university's Big Data cluster. Hadoop **HDFS** stored the data, **YARN** handed out
-the compute, and **Apache Spark** (through PySpark) ran the jobs. According to the CIM help desk, the
-"cluster" was **ten virtual-machine executors on a single physical server**. That detail explains a lot of the
-scaling behaviour in the [results](#results--performance-analysis).
+The project ran on the university's Big Data cluster. Hadoop **HDFS** stored the data, **YARN** handed out the
+compute, and **Apache Spark** (through PySpark) ran the jobs. According to the CIM help desk, the "cluster" was
+**ten virtual-machine executors on a single physical server**. That detail explains a lot of the scaling behaviour in
+the [results](#results--performance-analysis).
 
-### 1. Cluster & workflow
+### 1. End-to-end workflow
 
 ```mermaid
-flowchart TB
-    DEV["💻 <b>Local development</b><br/>write code · unit-test with PySpark local[1]"]
-    GIT[("GitLab<br/>issues · branches · merge requests")]
+flowchart LR
+    DEV["💻 <b>Laptop</b><br/>code + tests"] -->|push| GIT[("<b>GitLab</b>")]
+    GIT -->|clone| GW["<b>Gateway</b><br/>SSH · tmux"]
+    GW -->|spark-submit| CL["🏛️ <b>Spark on YARN</b><br/>100 GB on HDFS"]
+    CL -->|results CSV| VIZ["📊 <b>Laptop</b><br/>plots + map"]
+```
 
-    subgraph CLUSTER["🏛️ University Big Data cluster"]
-        GW["<b>Gateway node</b><br/>SSH + tmux · git clone<br/>time spark-submit"]
-        RM["<b>YARN ResourceManager</b><br/>grants executors · cores · memory"]
-        subgraph APP["Spark application"]
-            DRV["<b>Driver</b><br/>runs the PySpark script<br/>Catalyst optimiser · DAG scheduler"]
-            EX["<b>Executors</b> · 2–10 VMs<br/>all on one physical server<br/>1 task per partition per core"]
-        end
-        subgraph STORE["HDFS"]
-            NN["<b>NameNode</b><br/>file → block locations"]
-            DN[("<b>DataNodes</b><br/>128 MB blocks · 3× replicated<br/>Wikipedia XML · NOAA CSVs · outputs")]
-        end
-        UI["<b>Spark UI</b><br/>Jobs · Executors · DAG"]
-    end
+Code was written and unit-tested locally, tracked on GitLab (issues, feature branches, merge requests), then
+cloned onto the cluster's gateway node over SSH. Each 100 GB job was launched with `time spark-submit` inside a
+`tmux` session, so a dropped connection couldn't kill it. Only the small result CSVs came back to the laptop for
+plotting, so a chart could be changed without rerunning a 100 GB job.
 
-    VIZ["📊 <b>Local visualisation</b><br/>pandas · matplotlib · plotly"]
+### 2. Inside the cluster
 
-    DEV -->|git push| GIT
-    GIT -->|git clone| GW
-    GW -->|submit job| RM
-    RM -->|launch| DRV
-    RM -->|launch| EX
-    DRV -->|schedule tasks| EX
-    DRV -.- UI
-    DRV -.->|looks up block locations| NN
-    DN -->|read partitions| EX
-    EX -->|write result CSVs| DN
-    DN -->|hdfs dfs -get| VIZ
+```mermaid
+flowchart LR
+    RM["<b>YARN</b><br/>ResourceManager"] -->|launch| DRV["<b>Driver</b><br/>Catalyst · DAG"]
+    RM -->|launch| EX["<b>Executors</b><br/>2–10 × N cores"]
+    DRV -->|tasks| EX
+    DRV -.->|lookup| NN["<b>NameNode</b><br/>block map"]
+    DN[("<b>DataNodes</b><br/>128 MB blocks")] -->|read| EX
+    EX -->|write| DN
+    DRV -.-> UI["<b>Spark UI</b>"]
 ```
 
 | Component | Role in this project |
 |---|---|
-| **Gateway + tmux** | Reached over SSH. The code was `git clone`d here, and 100 GB jobs were launched inside `tmux` so that a dropped SSH connection couldn't kill them. Each job was wrapped in `time` to record its runtime. |
-| **YARN ResourceManager** | Grants the `--num-executors`, `--executor-cores` and `--executor-memory` requested on the `spark-submit` line. These were the independent variables in the experiments. |
-| **Spark driver** | Runs the PySpark script and builds the logical plan. Catalyst optimises the plan, and the DAG scheduler splits it into stages and tasks. |
-| **Executors** | Run the tasks in parallel, roughly one HDFS block (≈128 MB) per task. All 10 share the same server's CPU, RAM, disk and network, which is why speed-ups flatten after about 6–8 executors. |
-| **HDFS** | Holds the 100 GB Wikipedia dump, its 10–90 GB subsets, ~100 GB of NOAA weather CSVs and every job's output. The NameNode tracks where blocks live, so Spark can schedule tasks next to their data. |
-| **Spark UI** | Used to watch stage progress, executor memory and task spread, and the DAG, to check that the regex transformations were pipelined into a single stage. |
+| **YARN ResourceManager** | Grants the `--num-executors`, `--executor-cores` and `--executor-memory` requested by `spark-submit`. These were the independent variables in the experiments. |
+| **Driver** | Runs the PySpark script. Catalyst optimises the query plan, and the DAG scheduler splits it into stages and tasks. |
+| **Executors** | Run tasks in parallel, roughly one HDFS block per task. All 10 share one server's CPU, RAM, disk and network, which is why speed-ups flatten after about 6–8 executors. |
+| **NameNode / DataNodes** | HDFS splits files into 128 MB blocks, each replicated 3×. The NameNode tracks where every block lives, so tasks can be scheduled next to their data. |
+| **Spark UI** | Used to watch stage progress, executor memory and the DAG, for example to confirm that the regex transformations were pipelined into a single stage. |
 
-### 2. Lifecycle of one job
+### 3. Lifecycle of one job
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Me as Me (SSH + tmux)
+    actor Me
     participant Y as YARN
-    participant D as Spark Driver
+    participant D as Driver
     participant E as Executors
     participant H as HDFS
-
-    Me->>Y: time spark-submit --num-executors 6 --executor-cores 4 ...
-    Y->>D: start driver, allocate executor containers
-    D->>D: run script: transformations are only recorded (lazy)
-    Note over D: Action reached (show / write)<br/>Catalyst optimises the whole plan<br/>DAG is cut into stages at each shuffle
-    D->>E: schedule one task per input partition
+    Me->>Y: time spark-submit
+    Y->>D: start driver + executors
+    Note over D: lazy plan → action<br/>Catalyst → DAG of stages
+    D->>E: 1 task per partition
     E->>H: read 128 MB blocks
-    E->>E: narrow stage: parse, filter, clean (no data movement)
-    E->>E: Exchange: shuffle rows by key (groupBy / aggregation)
-    alt show()
-        E->>D: top results returned to driver
-    else write()
-        E->>H: write output CSV
-    end
-    D-->>Me: job finished, runtime printed by time
+    Note over E: narrow stage → shuffle → next stage
+    E->>H: write output CSV
+    D-->>Me: done · runtime
 ```
 
-### 3. How Spark actually executed it: stages and shuffles
+Every program is a chain of **lazy** DataFrame transformations ending in one **action** (`show()` or `write`).
+Nothing runs until that action is reached. Then Catalyst optimises the whole chain, merges consecutive *narrow*
+operations (`filter`, `withColumn`, `regexp_replace`) into one stage, and starts a new stage only where a *wide*
+operation needs a **shuffle**.
 
-Every program is written as a chain of **lazy DataFrame transformations** followed by one **action**. Nothing runs
-until the action is reached. Catalyst then optimises the whole chain, merges consecutive *narrow* operations
-(filter, `withColumn`, `regexp_replace`) into one stage, and starts a new stage only where a *wide* operation needs
-a **shuffle**. Here is the actual DAG from the Spark UI for the Statistical Analysis summary job:
+### 4. Stages and shuffles
 
-```mermaid
-flowchart TB
-    subgraph S0["<b>Stage 0</b> · 838 tasks"]
-        direction LR
-        A["scan NOAA CSVs<br/>explicit schema"] --> B["filter<br/>ELEMENT = TMAX"] --> C["value ÷ 10<br/>→ °C"] --> D["drop nulls<br/>keep −100…60 °C"] --> P["partial aggregate<br/>per partition"]
-    end
-    subgraph S1["<b>Stage 1</b> · 1 task"]
-        direction LR
-        F["final aggregate<br/>count · min · max · approx. median"] --> O[("summary CSV<br/>→ HDFS")]
-    end
-    S0 ==>|"Exchange (shuffle)"| S1
-```
-
-Most of the work happens in the parallel narrow stage, and only small partial results cross the network. How much
-each program shuffles is what separates their performance:
-
-| Program | Wide operations | Shuffle cost | Scaling (2 or 1 → 10 executors) |
-|---|---|---|---|
-| Distributed Grep | none: `explode` + `rlike` filter only | none | best: **10.6×** |
-| Word Count | `groupBy(word)` + `orderBy(count)` | large: every distinct word | **9.3×** |
-| Statistical Analysis | global aggregate + `groupBy(bucket)` | tiny (~67 MB) | **3.4×** |
-| K-Means | `groupBy(STATION)` + a shuffle on every K-Means iteration | 1.0–1.8 GB, grows with partitions | **3.0×** |
-
-### 4. Code design
-
-The interim programs (Word Count and Grep) are straightforward procedural scripts. For the final phase I switched
-to **test-driven, object-oriented code**. The K-Means logic lives in one `ClimateClusterer` class, and its constructor
-accepts an optional `spark_session`. The same code therefore runs unchanged in three places:
+This is the real DAG the Spark UI showed for the Statistical Analysis summary job:
 
 ```mermaid
 flowchart LR
-    T["tests/kMeansTest.py<br/>injects local[1] session<br/>mock stations"] --> CC
-    L["localKMeans.py · mapVisualisation.py<br/>100k-row local sample"] --> CC
-    B["BigData_KMeans.py<br/>session from spark-submit<br/>full 100 GB on cluster"] --> CC
-    CC["ClimateClusterer<br/>Testing/src/kMeans.py<br/>noaa_schema · clean_data()<br/>extract_features() · apply_kmeans()"]
+    subgraph S0["Stage 0 · 838 tasks"]
+        direction LR
+        A["scan CSV<br/>schema"] --> B["filter TMAX<br/>÷10 · bounds"] --> P["partial<br/>aggregate"]
+    end
+    subgraph S1["Stage 1 · 1 task"]
+        direction LR
+        F["final<br/>aggregate"] --> O[("CSV")]
+    end
+    S0 ==>|shuffle| S1
 ```
 
-The statistical analysis functions (`get_summary_stats`, `get_frequency_distribution`) are pure functions
-tested with **pytest** and PySpark's `assertDataFrameEqual`.
+The bulk of the work runs in the 838-task narrow stage, and only small partial results cross the network. How much
+each program has to shuffle is what separates their scaling:
+
+| Program | Wide operations | Shuffle cost | Speed-up at 10 executors |
+|---|---|---|---|
+| Distributed Grep | none: `explode` + `rlike` filter only | none | **10.6×** (vs 1 executor) |
+| Word Count | `groupBy(word)` + `orderBy(count)` | large: every distinct word | **9.3×** (vs 1 executor) |
+| Statistical Analysis | global aggregate + `groupBy(bucket)` | tiny (~67 MB) | **3.4×** (vs 2 executors) |
+| K-Means | `groupBy(STATION)` + a shuffle on every iteration | 1.0–1.8 GB, grows with partitions | **3.0×** (vs 2 executors) |
+
+### 5. Code design
+
+```mermaid
+flowchart LR
+    T["<b>kMeansTest.py</b><br/>local[1] · mock stations"] --> CC
+    L["<b>localKMeans.py</b><br/>100k-row sample"] --> CC
+    B["<b>BigData_KMeans.py</b><br/>spark-submit · 100 GB"] --> CC
+    CC["<b>ClimateClusterer</b><br/>clean_data · extract_features<br/>apply_kmeans"]
+```
+
+The interim programs (Word Count and Grep) are straightforward procedural scripts. For the final phase I switched
+to **test-driven, object-oriented code**. `ClimateClusterer` takes an optional `spark_session`, so the same class
+runs unchanged in the unit tests, the local prototypes and the full cluster job. The statistical analysis functions
+are pure functions tested with **pytest** and PySpark's `assertDataFrameEqual`.
 
 ---
 
@@ -165,87 +148,79 @@ tested with **pytest** and PySpark's `assertDataFrameEqual`.
 ### Text workloads: Wikipedia XML (Problems 1 & 2)
 
 ```mermaid
-flowchart TD
-    W0[("HDFS · wiki_100gb.xml")] --> W1["spark-xml reader<br/>rowTag = page → one row per article"]
-    W1 --> W2["keep real articles<br/>ns = 0 · not a redirect · text not null"]
-    W2 --> W3["shared cleaning · built-in Spark SQL functions, no UDFs<br/>lower() · strip links, templates, refs, HTML, URLs<br/>keep a–z only · drop stray single letters"]
-    W3 --> W4["split + explode<br/>one row per word"]
-    W4 --> C1["drop numbers and<br/>markup junk words"]
-    C1 --> C2["groupBy word · count<br/>wide → shuffle"]
-    C2 --> C3["orderBy count desc<br/>show top 20"]
-    W4 --> G1["filter word rlike 'queen'<br/>narrow → no shuffle"]
-    G1 --> G2["output matched_string<br/>+ article title"]
-
+flowchart TB
+    subgraph PREP["Shared load + clean"]
+        direction LR
+        W0[("wiki XML<br/>100 GB")] --> W1["spark-xml<br/>1 row / page"] --> W2["articles<br/>only"] --> W3["regex<br/>cleaning"] --> W4["explode<br/>to words"]
+    end
     subgraph WC["1 · Word Count"]
-        C1
-        C2
-        C3
+        direction LR
+        C1["drop junk<br/>words"] --> C2["groupBy<br/>count"] --> C3["top 20"]
     end
     subgraph GR["2 · Distributed Grep"]
-        G1
-        G2
+        direction LR
+        G1["rlike<br/>'queen'"] --> G2["word +<br/>title"]
     end
+    PREP --> WC
+    PREP --> GR
 ```
 
-### 1. Word Count: [`product/BigData_WikiWordCount.py`](product/BigData_WikiWordCount.py)
+**Shared load + clean** (narrow transformations, no shuffle):
 1. Read the XML dump with `spark-xml`, using `rowTag="page"` so that each `<page>` becomes one row.
-2. Keep only real articles (`ns == 0`, not redirects) and pull out `revision.text`.
-3. Clean the text with a chain of `regexp_replace` calls: lowercase, strip `[[links]]`, `{{templates}}`, `<ref>` and HTML tags and URLs, keep only `a–z`, and drop single letters other than *a* and *i*.
-4. `split` + `explode` into words, then remove numeric tokens and markup junk words (`infobox`, `wikitable`, `colspan`, …).
-5. `groupBy("word").count().orderBy(desc)`.
+2. Keep only real articles (`ns == 0`, not redirects, text not null) and pull out `revision.text`.
+3. Clean the text with built-in Spark SQL functions rather than UDFs, so Catalyst can optimise them: lowercase it, strip `[[links]]`, `{{templates}}`, `<ref>` and HTML tags and URLs, keep only `a–z`, and drop single letters other than *a* and *i*.
+4. `split` + `explode` into one row per word.
 
-### 2. Distributed Grep: [`product/BigData_WikiDistributedGrep.py`](product/BigData_WikiDistributedGrep.py)
-Uses the same load-and-clean pipeline as Word Count, then explodes each article into words and keeps those matching a
-regex (`"queen"` in the benchmarks). It returns `(matched_string, location=article title)` pairs.
+#### 1. Word Count: [`product/BigData_WikiWordCount.py`](product/BigData_WikiWordCount.py)
+Drops numeric tokens and markup junk words (`infobox`, `wikitable`, `colspan`, …), then
+`groupBy("word").count().orderBy(desc)`. The `groupBy` is a wide transformation and triggers the shuffle.
+
+#### 2. Distributed Grep: [`product/BigData_WikiDistributedGrep.py`](product/BigData_WikiDistributedGrep.py)
+Keeps the words matching a regex (`"queen"` in the benchmarks) and returns `(matched_string, article title)` pairs.
+It is a pure filtering workload with no global aggregation, which is why it scales best of the four programs.
 
 ### Numerical workloads: NOAA GHCN-Daily (Problems 3 & 4)
 
+Both programs read the NOAA CSVs (1900–2025, ~100 GB) with an **explicit `StructType` schema**. This skips a
+schema-inference pass over 100 GB and lets Catalyst prune unused columns. They then apply the same cleaning:
+`TMAX` records only, tenths of °C converted to °C, nulls dropped, and values outside −100…60 °C removed.
+
+#### 3. Statistical Analysis: [`product/BigData_StatAnalysis.py`](product/BigData_StatAnalysis.py)
+
 ```mermaid
-flowchart TD
-    N0[("HDFS · NOAA GHCN-Daily CSVs<br/>1900–2025 · ~100 GB")] --> N1["read with explicit StructType schema<br/>no inference pass · column pruning"]
-    N1 --> N2["clean: ELEMENT = TMAX · ÷10 → °C<br/>drop nulls · keep −100…60 °C"]
-
-    subgraph SA["3 · Statistical Analysis"]
-        S1["count · min · max<br/>percentile_approx median"]
-        S2["Bucketizer: 10 equal-width bins<br/>groupBy bucket · count"]
-        S3["join readable range labels"]
-        S2 --> S3
-    end
-
-    subgraph KM["4 · K-Means"]
-        K1["groupBy STATION<br/>avg · max · min · range"]
-        K2["VectorAssembler<br/>avg_temp + temp_range"]
-        K3["StandardScaler"]
-        K4["KMeans k = 5 · seed 42<br/>iterates to convergence"]
-        K1 --> K2 --> K3 --> K4
-    end
-
-    N2 --> S1
-    N2 --> S2
-    N2 --> K1
-    S1 --> O1[("summary + distribution CSVs")]
-    S3 --> O1
-    K4 --> O2[("clustered stations CSV")]
-    O2 -- "hdfs dfs -get" --> V1["join ghcnd-stations.txt lat/long<br/>rank zones coldest → hottest"]
-    V1 --> V2["plotly world map<br/>matplotlib scatter"]
+flowchart LR
+    IN[("<b>NOAA CSVs</b><br/>~100 GB")] --> CL["schema read<br/>TMAX · °C · bounds"]
+    CL --> S1["count · min · max<br/>approx. median"] --> O1[("summary CSV")]
+    CL --> S2["Bucketizer<br/>10 bins · count"] --> S3["range<br/>labels"] --> O2[("distribution CSV")]
 ```
 
-### 3. Statistical Analysis: [`product/BigData_StatAnalysis.py`](product/BigData_StatAnalysis.py)
-1. Read the NOAA CSVs with an **explicit schema**, which avoids a schema-inference pass over 100 GB.
-2. Filter to `TMAX` records, convert tenths of °C to °C, and remove nulls and implausible values (outside −100 to 60 °C).
-3. Compute count, min, max and an **approximate median** (`percentile_approx`), because an exact median would need a full sort.
-4. Build a 10-bucket frequency distribution with MLlib's `Bucketizer` and write both outputs to HDFS as CSV.
+- **Summary statistics** are calculated in one distributed aggregation. The median uses `percentile_approx`, because an exact median would need a full global sort.
+- **Frequency distribution**: MLlib's `Bucketizer` puts every temperature into one of 10 equal-width bins, and a `groupBy(bucket)` counts them. Readable range labels are then joined on.
+- Both outputs are written to HDFS as CSV, which is easier to inspect and move than Parquet.
 
-### 4. K-Means Clustering: [`product/BigData_KMeans.py`](product/BigData_KMeans.py) + [`product/Testing/src/kMeans.py`](product/Testing/src/kMeans.py)
-The logic sits in a reusable, unit-tested `ClimateClusterer` class:
-1. `clean_data`: keeps TMAX records and converts them to °C.
-2. `extract_features`: for each station, computes `avg_temp`, `max_temp`, `min_temp` and `temp_range`.
-3. `apply_kmeans`: `VectorAssembler(avg_temp, temp_range)` → `StandardScaler` → `KMeans(k=5, seed=42)`.
-4. Writes the clustered stations to HDFS. [`BigData_KMeans_Map.py`](product/BigData_KMeans_Map.py) then joins them with NOAA station coordinates and draws an interactive world map, and [`BigData_KMeans_Scatter.py`](product/BigData_KMeans_Scatter.py) draws a scatter plot of the clusters.
+#### 4. K-Means Clustering: [`product/BigData_KMeans.py`](product/BigData_KMeans.py) + [`product/Testing/src/kMeans.py`](product/Testing/src/kMeans.py)
+
+```mermaid
+flowchart TB
+    subgraph CLU["On the cluster"]
+        direction LR
+        K0["clean<br/>TMAX"] --> K1["per-station<br/>features"] --> K2["assemble<br/>+ scale"] --> K3["KMeans<br/>k = 5"] --> KO[("clusters<br/>CSV")]
+    end
+    subgraph LOC["Locally"]
+        direction LR
+        V1["download"] --> V2["join<br/>lat / long"] --> V3["rank zones<br/>cold → hot"] --> V4["map +<br/>scatter"]
+    end
+    CLU --> LOC
+```
+
+- **`extract_features`** computes `avg_temp`, `max_temp`, `min_temp` and `temp_range` for each station.
+- **`apply_kmeans`** runs `VectorAssembler(avg_temp, temp_range)` → `StandardScaler` → `KMeans(k=5, seed=42)`, and writes the clustered stations to HDFS.
+- **Locally:** [`BigData_KMeans_Map.py`](product/BigData_KMeans_Map.py) joins the clusters with NOAA station coordinates, ranks the zones from coldest to hottest and draws an interactive Plotly world map. [`BigData_KMeans_Scatter.py`](product/BigData_KMeans_Scatter.py) draws the average temperature against the temperature range.
 
 > **Design decision:** the first version also clustered on precipitation. That produced clusters with no
 > geographic pattern, so precipitation was dropped. Clustering on temperature alone gives zones that line up
-> with real climate bands on the map.
+> with real climate bands: Scandinavia, Canada and Russia in the coldest zones, and Central Africa, South-East Asia
+> and Northern Australia in the hottest.
 
 ---
 
